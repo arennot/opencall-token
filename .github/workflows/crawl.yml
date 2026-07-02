@@ -1,0 +1,57 @@
+name: Daily Crawl
+
+on:
+  schedule:
+    # 每天早上 8:00 UTC+8 = 0:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:  # 支持手动触发
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r crawlers/requirements.txt
+
+      - name: Crawl Res Artis
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd crawlers
+          scrapy crawl resartis -s LOG_FILE=../logs/resartis.log
+
+      - name: Crawl Transartists
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd crawlers
+          scrapy crawl transartists -s LOG_FILE=../logs/transartists.log
+
+      - name: Crawl CaFE
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd crawlers
+          scrapy crawl cafe -s LOG_FILE=../logs/cafe.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crawl-logs
+          path: logs/

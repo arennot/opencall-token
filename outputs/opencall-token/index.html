@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCall Token — 每日全球艺术征集 & 驻留 & 资助</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner container">
+    <div class="logo">
+      <span class="logo-icon">◈</span>
+      <div class="logo-text">
+        <h1>OpenCall Token</h1>
+        <span class="logo-sub">每日艺术机会聚合</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <button class="nav-btn active" data-view="all">全部</button>
+      <button class="nav-btn" data-view="opencall">征集</button>
+      <button class="nav-btn" data-view="residency">驻留</button>
+      <button class="nav-btn" data-view="grant">资助</button>
+      <button class="nav-btn" data-view="local">本地</button>
+    </nav>
+    <button class="submit-btn" id="submitBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m5 12 7 7 7-7"/></svg>
+      发布机会
+    </button>
+    <div class="search-wrap">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" class="search-input" placeholder="搜索机会、机构、地点..." id="searchInput">
+    </div>
+  </div>
+</header>
+
+<main class="main container">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="result-count" id="resultCount">加载中...</span>
+    </div>
+    <div class="toolbar-right">
+      <label class="sort-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+        排序
+      </label>
+      <select id="sortSelect" class="sort-select">
+        <option value="deadline">截止日期 ↑</option>
+        <option value="deadline-desc">截止日期 ↓</option>
+        <option value="newest" selected>最新发布</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="cards-grid" id="cardsGrid"></div>
+</main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modalClose" aria-label="关闭">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <p>OpenCall Token — 每日自动收录全网艺术公开征集、驻留项目与艺术家资助机会</p>
+    <p class="footer-meta">原型版本 · 数据为示例展示</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-integration.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+</html>
+
+<!-- Submit Modal -->
+<div class="modal-overlay" id="submitOverlay">
+  <div class="modal modal-form" id="submitModal">
+    <button class="modal-close" id="submitClose" aria-label="关闭">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <h2 class="modal-title" style="margin-bottom:20px">发布艺术机会</h2>
+    <form id="submitForm" class="submit-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="formTitle">机会标题 *</label>
+          <input type="text" id="formTitle" required placeholder="例: 2027 驻留项目征件">
+        </div>
+        <div class="form-group">
+          <label for="formOrg">主办机构 *</label>
+          <input type="text" id="formOrg" required placeholder="机构或空间名称">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="formType">类型 *</label>
+          <select id="formType" required>
+            <option value="opencall">公开征集</option>
+            <option value="residency">驻留项目</option>
+            <option value="grant">资金资助</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="formDeadline">截止日期</label>
+          <input type="date" id="formDeadline">
+          <small>留空表示全年开放</small>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="formLocation">地点 *</label>
+          <input type="text" id="formLocation" required placeholder="城市, 国家 或 远程">
+        </div>
+        <div class="form-group">
+          <label for="formDisciplines">适用学科</label>
+          <input type="text" id="formDisciplines" placeholder="逗号分隔，如: 绘画, 雕塑, 摄影">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="formFunding">资金说明</label>
+        <input type="text" id="formFunding" placeholder="例: 每月津贴 ¥5,000 + 住宿">
+      </div>
+      <div class="form-group">
+        <label for="formDesc">描述 *</label>
+        <textarea id="formDesc" rows="3" required placeholder="简短介绍这个机会..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="formUrl">原始链接 *</label>
+          <input type="url" id="formUrl" required placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label for="formContact">联系方式</label>
+          <input type="text" id="formContact" placeholder="邮箱或微信">
+          <small>不对外公开，仅用于审核</small>
+        </div>
+      </div>
+      <button type="submit" class="form-submit-btn">提交机会</button>
+      <p class="form-note">提交后我们将人工审核，通过后会在「社区」频道展示</p>
+    </form>
+    <div id="submitSuccess" class="submit-success" style="display:none">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <h3>提交成功！</h3>
+      <p>我们将尽快审核你的发布，通过后会在「社区」频道展示。</p>
+      <button class="form-submit-btn" id="submitAnother" type="button">再发一条</button>
+    </div>
+  </div>
+</div>
