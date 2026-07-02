@@ -1,0 +1,32 @@
+name: Test Crawl -- Transartists x Supabase
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install test dependencies
+        run: |
+          pip install scrapy supabase dateparser itemadapter
+
+      - name: Run transartists spider (limit 3 items)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd crawlers
+          scrapy crawl transartists -s CLOSESPIDER_ITEMCOUNT=3
+          echo "=== Test finished ==="

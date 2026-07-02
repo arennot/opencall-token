@@ -1,12 +1,13 @@
-$SUPABASE_URL = "https://mbmzekzhgbngpvdibfea.supabase.co"
-$SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ibXpla3poZ2JuZ3B2ZGliZmVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjg2OTQ2NCwiZXhwIjoyMDk4NDQ1NDY0fQ.A89_SQwRqmuw_F5Vvwm3gqhL-CaINP8aIp1oobQMIXE"
-$appjs = Get-Content "C:\\Users\\arenn\\Documents\\Codex\\2026-06-30\\opencall-token\\outputs\opencall-token\app.js" -Encoding UTF8 -Raw
+﻿$SUPABASE_URL = "https://mbmzekzhgbngpvdibfea.supabase.co"
+$SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ibXpla3poZ2JuZ3B2ZGliZmVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjg2OTQ2NCwiZXhwIjoyMDk4NDQ1NDY0fQ.A89_SQyRqmuw_F5Vvwm3gqhL-CaINP8aIp1oobQMIXE"
+$appjs = Get-Content "C:\Users\arenn\Documents\Codex\2026-06-30\opencall-token\outputs\opencall-token\app.js" -Encoding UTF8 -Raw
 $match = [regex]::Match($appjs, '(?s)const opportunities = (\[.+?\]);')
 if (!$match.Success) { Write-Error "Not found"; exit 1 }
 $json = $match.Groups[1].Value -replace ',\s*\]', ']' -replace 'undefined', 'null'
 $items = $json | ConvertFrom-Json
 Write-Host ("Found " + $items.Count + " items")
 $headers = @{
+  apikey = $SERVICE_KEY
   Authorization = "Bearer " + $SERVICE_KEY
   "Content-Type" = "application/json"
 }
@@ -31,4 +32,5 @@ foreach ($opp in $items) {
     $s++
   }
 }
-Write-Host ("`nDone! Inserted: " + $i + ", Skipped: " + $s)
+Write-Host ("
+Done! Inserted: " + $i + ", Skipped: " + $s)
