@@ -8,7 +8,7 @@ class TransartistsSpider(scrapy.Spider):
 
     name = "transartists"
     allowed_domains = ["transartists.org"]
-    start_urls = ["https://www.transartists.org/en/opportunities"]
+    start_urls = ["https://www.transartists.org/en/transartists-calls"]
 
     def parse(self, response):
         """解析列表页"""
