@@ -28,5 +28,5 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           cd crawlers
-          scrapy crawl transartists -s CLOSESPIDER_ITEMCOUNT=3
+          scrapy crawl transartists
           echo "=== Test finished ==="
