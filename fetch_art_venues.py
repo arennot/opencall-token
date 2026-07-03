@@ -43,6 +43,8 @@ NOISE_KEYWORDS = [
     "培训", "儿童", "少儿", "画室", "教育", "班",
     "刺青", "纹身", "婚纱", "摄影", "工作室", "设计",
     "快印", "家具", "建材", "餐厅", "咖啡",
+# === 新增茶空间与休闲娱乐黑名单 ===
+    "茶空间", "茶艺", "茶道", "茶楼", "茶馆", "禅茶", "围炉煮茶"
 ]
 
 # 高德 API 单页最大返回条数（官方上限 25，设为 25 以减少请求次数）
@@ -101,7 +103,7 @@ def should_keep_by_type(poi: dict) -> bool:
     if typecode.startswith("05"):
         return True
     # 名称中带"艺术空间"的白名单
-    if "艺术空间" in name:
+    if "艺术空间" in name or "画廊" in name or "Gallery" in name.into_upper():
         return True
 
     return False
@@ -250,8 +252,14 @@ def main():
     def refine_type(row):
         typecode = row.get("typecode", "")
         name = row.get("name", "")
+
+    # 核心防漏规则：如果名字里包含单字 "茶"，且它不是正规的文化馆（16开头）或景区（05开头）
+    # 比如餐饮类(05/06)里面的"某某茶艺术空间"，直接剔除
+        if "茶" in name and not typecode.startswith(("16", "05")):
+            return False
+    
         # 如果不是我们信任的大类，且名称不含"艺术空间"，标记为可疑
-        if not typecode.startswith(("16", "05")) and "艺术空间" not in name:
+        if not typecode.startswith(("16", "05")) and not any(kw in name for kw in ["艺术空间", "画廊"]):
             return False  # 丢弃
         return True
 
