@@ -10,6 +10,9 @@ jobs:
   build-and-run:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
     # 1. 签出仓库代码
     - name: Checkout repository
