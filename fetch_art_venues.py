@@ -28,7 +28,6 @@ import os
 # 高德地图 Web 服务 API Key
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
-
 # 高德 POI 搜索接口地址
 AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
 
@@ -36,7 +35,7 @@ AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
 CITY = "北京市"
 
 # 检索关键字列表
-KEYWORDS = ["美术馆", "当代艺术", "艺术空间", "画院", "画廊", "艺术中心", "空间","gallery"]
+KEYWORDS = ["美术馆", "当代艺术", "艺术空间", "画院", "画廊", "艺术中心", "空间", "gallery"]
 
 # 噪音过滤器 —— 凡是名称、类型或地址中包含以下任一词条的 POI 都会被丢弃
 NOISE_KEYWORDS = [
@@ -262,20 +261,25 @@ def main():
     df = pd.DataFrame(venues)
 
     # === 对部分 typecode 分类做进一步人工规则补充 ===
-    # 将 typecode 归入 99xxxx（不确定类别）的记录改为明确的零售类别，
-    # 防止误保留纯商业场所（除非名字含"艺术空间"）
     def refine_type(row):
         typecode = row.get("typecode", "")
         name = row.get("name", "")
+        ptype = row.get("type", "")
 
-    # 核心防漏规则：如果名字里包含单字 "茶"，且它不是正规的文化馆（16开头）或景区（05开头）
-    # 比如餐饮类(05/06)里面的"某某茶艺术空间"，直接剔除
+        # 核心防漏规则：如果名字里包含单字 "茶"，且它不是正规的文化馆（16开头）或景区（05开头）
+        # 比如餐饮类(05/06)里面的"某某茶艺术空间"，直接剔除
         if "茶" in name and not typecode.startswith(("16", "05")):
             return False
     
-        # 如果不是我们信任的大类，且名称不含"艺术空间"，标记为可疑
+        # ==========================================================
+        # 🛠️ 临时排查逻辑：揪出到底是谁被卡在了这里
+        # ==========================================================
         if not typecode.startswith(("16", "05")) and not any(kw in name for kw in ["艺术空间", "画廊"]):
+            # 如果名字里包含“空间”，但因为触发了上面的严格限制被拦截，我们把它打印出来看看
+            if "空间" in name:
+                print(f"🔍 [拦截排查] 名称: {name} | 编码: {typecode} | 官方分类: {ptype}")
             return False  # 丢弃
+            
         return True
 
     before = len(df)
@@ -304,3 +308,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+  
