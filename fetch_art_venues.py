@@ -101,9 +101,9 @@ OUTPUT_CSV = "beijing_art_museums_raw.csv"
 def is_noise(poi: dict) -> bool:
     """判断 POI 是否为噪音：检查 name / type / address 三字段，
     若包含 NOISE_KEYWORDS 中任一关键词则返回 True（应丢弃）。"""
-    name = poi.get("name", "")
-    ptype = poi.get("type", "")
-    address = poi.get("address", "")
+    name = str(poi.get("name", ""))
+    ptype = str(poi.get("type", ""))
+    address = str(poi.get("address", ""))
     for kw in NOISE_KEYWORDS:
         if kw in name or kw in ptype or kw in address:
             return True
@@ -113,9 +113,9 @@ def is_noise(poi: dict) -> bool:
 def has_salvage_keyword(poi: dict) -> bool:
     """关键字打捞：检查 POI 的 name / type / address 三字段中
     是否包含 SALVAGE_KEYWORDS 中的任意一个词。命中则保留。"""
-    name = poi.get("name", "")
-    ptype = poi.get("type", "")
-    address = poi.get("address", "")
+    name = str(poi.get("name", ""))
+    ptype = str(poi.get("type", ""))
+    address = str(poi.get("address", ""))
     for kw in SALVAGE_KEYWORDS:
         if kw.lower() in name.lower() or kw.lower() in ptype.lower() or kw.lower() in address.lower():
             return True
