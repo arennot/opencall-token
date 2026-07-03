@@ -36,7 +36,7 @@ AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
 CITY = "北京市"
 
 # 检索关键字列表
-KEYWORDS = ["美术馆", "当代艺术中心", "艺术空间", "画院"]
+KEYWORDS = ["美术馆", "当代艺术", "艺术空间", "画院", "画廊", "艺术中心", "空间"]
 
 # 噪音过滤器 —— 凡是名称、类型或地址中包含以下任一词条的 POI 都会被丢弃
 NOISE_KEYWORDS = [
