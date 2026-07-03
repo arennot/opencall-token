@@ -4,13 +4,23 @@
 高德地图 POI 批量抓取脚本 —— 北京艺术场馆数据采集
 
 功能说明：
-  利用高德地图 Web 服务 API（text_search 接口），批量检索北京的美术馆、
-  当代艺术中心、艺术空间等关键词，经过噪音过滤与去重后，
-  输出结构化的场馆 CSV 数据。
+  利用高德地图 Web 服务 API（text_search 接口），批量检索北京
+  美术馆、当代艺术中心、艺术空间、画院、画廊等关键词，经过两阶段
+  清洗（分类路由 -> 缓冲池噪音过滤 + 关键字打捞），输出结构化的
+  场馆 CSV 数据，用于艺术聚合平台。
 
-使用方法：
-  1. 将下方 AMAP_KEY 替换为你的高德 Web 服务 API Key。
-  2. 运行本脚本，等待抓取完成即可在同目录下生成 CSV。
+两阶段流程：
+  第一阶段：分页检索 + 分类路由
+    - 140400（美术馆）-> 直接收录
+    - 140200/140000/140100/170000/170100/170200/110204/061300/061301 -> 缓冲池
+    - 其余 -> 丢弃
+  第二阶段：缓冲池清洗
+    - 黑名单噪音过滤
+    - 关键字打捞（名/类/址需含艺术、美术、画院、美术馆、画廊、空间、中心、馆等）
+
+使用方法（GitHub Actions）：
+  通过环境变量 AMAP_KEY 传入高德 Web 服务 API Key。
+  本地运行时：$env:AMAP_KEY="your_key"; python fetch_art_venues.py
 
 依赖：
   pip install pandas requests
@@ -22,10 +32,10 @@ import pandas as pd
 import os
 
 # ============================================================
-# 1. 参数配置
+# 1. 参数配置（入口配置区）
 # ============================================================
 
-# 高德地图 Web 服务 API Key
+# 高德地图 Web 服务 API Key（从环境变量读取，适配 GitHub Actions）
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
 # 高德 POI 搜索接口地址
@@ -35,18 +45,46 @@ AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
 CITY = "北京市"
 
 # 检索关键字列表
-KEYWORDS = ["美术馆", "当代艺术", "艺术空间", "画院", "画廊", "艺术中心", "空间", "gallery"]
+KEYWORDS = [
+    "美术馆", "当代艺术", "艺术空间", "画院",
+    "画廊", "艺术中心", "空间", "gallery",
+]
 
-# 噪音过滤器 —— 凡是名称、类型或地址中包含以下任一词条的 POI 都会被丢弃
+# 噪音黑名单 —— 凡是名称、类型或地址命中以下任一词条，直接丢弃
 NOISE_KEYWORDS = [
     "培训", "儿童", "少儿", "画室", "教育", "班",
     "刺青", "纹身", "婚纱", "摄影", "设计", "家居",
     "快印", "家具", "建材", "餐厅", "咖啡",
-# === 新增茶空间与休闲娱乐黑名单 ===
-    "茶空间", "茶艺", "茶道", "茶楼", "茶馆", "禅茶", "围炉煮茶"
+    # === 茶空间与休闲娱乐黑名单 ===
+    "茶空间", "茶艺", "茶道", "茶楼", "茶馆", "禅茶", "围炉煮茶",
 ]
 
-# 高德 API 单页最大返回条数（官方上限 25，设为 25 以减少请求次数）
+# 关键字打捞词 —— 对缓冲池数据做二次筛选，名/类/址中含以下词则保留
+SALVAGE_KEYWORDS = [
+    "艺术", "美术", "画院", "美术馆", "画廊",
+    "空间", "中心", "馆",
+    "gallery", "space",
+]
+
+# 直接收录分类编码（此类 POI 一步到位，不经过任何清洗）
+DIRECT_TYPECODES = {
+    "140400",  # 美术馆
+}
+
+# 缓冲池分类编码（此类 POI 先收入缓冲池，再统一做噪音过滤 + 关键字打捞）
+BUFFER_TYPECODES = {
+    "140200",  # 展览馆
+    "140000",  # 科教文化场所
+    "140100",  # 博物馆
+    "170000",  # 公司企业
+    "170100",  # 知名企业
+    "170200",  # 公司
+    "110204",  # 纪念馆
+    "061300",  # 特殊买卖场所
+    "061301",  # 拍卖行
+}
+
+# 高德 API 单页最大返回条数（官方上限 25）
 PAGE_SIZE = 25
 
 # 请求间隔（秒），用于避免触发 QPS 限制
@@ -57,76 +95,46 @@ OUTPUT_CSV = "beijing_art_museums_raw.csv"
 
 
 # ============================================================
-# 2. 核心清洗函数
+# 2. 核心处理函数
 # ============================================================
 
 def is_noise(poi: dict) -> bool:
-    """
-    判断一条 POI 是否为噪音数据。
-
-    检查 name / type / address 三个字段是否包含 NOISE_KEYWORDS
-    中的任意一个词。命中则返回 True（应丢弃）。
-    """
+    """判断 POI 是否为噪音：检查 name / type / address 三字段，
+    若包含 NOISE_KEYWORDS 中任一关键词则返回 True（应丢弃）。"""
     name = poi.get("name", "")
     ptype = poi.get("type", "")
     address = poi.get("address", "")
-
     for kw in NOISE_KEYWORDS:
         if kw in name or kw in ptype or kw in address:
             return True
     return False
 
 
-def should_keep_by_type(poi: dict) -> bool:
-    """
-    通用型核心筛选漏斗（去掉城市区域限制，最大化长尾包容度）：
-    1. 官方标签（type）明确标注“画廊”或“美术馆”直接放行（如北京公社）。
-    2. 文化场馆大类（16开头）中，放宽对所有展览馆的拦截，只要不是明确的商业展销就放行。
-    3. 名字包含“美术馆、艺术、画廊、空间、中心、馆、Gallery、Space”等任何泛艺术/泛场馆词汇，在其余分类中强行补漏（如某某空间moumou）。
-    """
-    typecode = str(poi.get("typecode", ""))
-    ptype = str(poi.get("type", ""))      # 高德官方标签流
-    name = str(poi.get("name", ""))
-
-    # ----------------------------------------------------
-    # 第一层：【官方核心标签判定】（全国通用，最高优先级）
-    # 只要官方标签里明确写了“画廊”或“美术馆”，直接放行
-    # ----------------------------------------------------
-    if "画廊" in ptype or "美术馆" in ptype:
-        return True
-
-    # ----------------------------------------------------
-    # 第二层：【行业大类放行】（无城市区域限制）
-    # 16开头属于 文化/艺术/体育 大类，05开头属于 景区/园区大类
-    # ----------------------------------------------------
-    if typecode.startswith("16") or typecode.startswith("05"):
-        # 如果是 160106（展览馆），由于第一关 NOISE_KEYWORDS 已经过滤了“车展/婚博会/博览中心/会议中心”，
-        # 剩下的中小型展览馆（比如长征空间、某某空间moumou）我们选择【全量放行】，确保一个不漏！
-        return True
-
-    # ----------------------------------------------------
-    # 第三层：【跨门类名字长尾补漏】
-    # 如果高德把它分到了购物(07)、餐饮(06)、生活服务(08)等奇怪分类，
-    # 只要名字里有任何泛艺术馆所的蛛丝马迹，强行捞回
-    # ----------------------------------------------------
-    # 扩充了匹配词库，加入了“空间”、“中心”、“馆”以及英文“space”
-    match_keywords = [
-        "美术馆", "艺术中心", "艺术空间", "当代艺术", "画院", 
-        "空间", "画廊", "美术", "艺术", "中心", "馆", 
-        "gallery", "space"
-    ]
-    
-    if any(k in name.lower() for k in match_keywords):
-        return True
-
-    # 未触发任何放行规则，丢弃
+def has_salvage_keyword(poi: dict) -> bool:
+    """关键字打捞：检查 POI 的 name / type / address 三字段中
+    是否包含 SALVAGE_KEYWORDS 中的任意一个词。命中则保留。"""
+    name = poi.get("name", "")
+    ptype = poi.get("type", "")
+    address = poi.get("address", "")
+    for kw in SALVAGE_KEYWORDS:
+        if kw.lower() in name.lower() or kw.lower() in ptype.lower() or kw.lower() in address.lower():
+            return True
     return False
 
 
+def classify_poi(poi: dict) -> str:
+    """根据 typecode 对 POI 分类路由。
+    返回值："direct"（直接收录）| "buffer"（进入缓冲池）| "discard"（丢弃）"""
+    typecode = poi.get("typecode", "")
+    if typecode in DIRECT_TYPECODES:
+        return "direct"
+    if typecode in BUFFER_TYPECODES:
+        return "buffer"
+    return "discard"
+
+
 def extract_fields(poi: dict) -> dict:
-    """
-    从高德返回的单条 POI 字典中提取所需字段。
-    """
+    """从高德 API 返回的单条 POI 字典中提取所需字段。"""
     return {
         "id": poi.get("id", ""),
         "name": poi.get("name", ""),
@@ -141,17 +149,41 @@ def extract_fields(poi: dict) -> dict:
     }
 
 
+def clean_buffer(buffer: list[dict]) -> list[dict]:
+    """缓冲池清洗：先过滤噪音，再关键字打捞，通过者收录。"""
+    result = []
+    noise_count = 0
+    for poi in buffer:
+        if is_noise(poi):
+            noise_count += 1
+            continue
+        if has_salvage_keyword(poi):
+            result.append(extract_fields(poi))
+    print(f"  缓冲池清洗：{len(buffer)} 条 -> 噪音过滤移除 {noise_count} 条 -> "
+          f"打捞后收录 {len(result)} 条")
+    return result
+
+
 # ============================================================
-# 3. 分页检索与去重逻辑
+# 3. 分页检索与两阶段采集
 # ============================================================
 
 def fetch_all_venues() -> list[dict]:
     """
-    遍历所有关键字，对每个关键字进行分页拉取，
-    经过噪音过滤、类别筛选、全局去重后返回纯净的场馆列表。
+    两阶段采集流程：
+    第一阶段 —— 分页检索与分类路由：
+      遍历每个关键字，逐页请求高德 POI 搜索 API。
+      对每条 POI 根据 typecode 路由：
+        - "direct" -> 直接收录到最终列表
+        - "buffer" -> 暂存到缓冲池
+        - "discard" -> 直接丢弃
+      全局以 id 去重。
+    第二阶段 —— 缓冲池清洗与打捞：
+      噪音过滤 -> 关键字打捞 -> 收录。
     """
     seen_ids: set[str] = set()
     all_venues: list[dict] = []
+    buffer_pool: list[dict] = []
 
     for keyword in KEYWORDS:
         print(f"\n====== 开始检索关键词：{keyword} ======")
@@ -179,14 +211,13 @@ def fetch_all_venues() -> list[dict]:
                 print(f"  [错误] JSON 解析失败（第{page}页）：{e}")
                 break
 
-            # 检查 API 返回状态
             status = data.get("status", "0")
             if status != "1":
                 info = data.get("info", "未知错误")
                 print(f"  [错误] API 返回异常（第{page}页）：{info}")
-                # 如果因为额度超限（10003），直接终止整个流程
                 if data.get("infocode") == "10003":
                     print("  [严重] API 额度超限，终止抓取。")
+                    all_venues.extend(clean_buffer(buffer_pool))
                     return all_venues
                 break
 
@@ -197,42 +228,42 @@ def fetch_all_venues() -> list[dict]:
                 print(f"  第{page}页无数据，结束当前关键词。")
                 break
 
-            # 逐条处理
-            page_new_count = 0
+            page_direct = 0
+            page_buffer = 0
+
             for poi in pois:
                 poi_id = poi.get("id", "")
-
-                # 全局去重（以 id 为唯一标识）
                 if poi_id in seen_ids:
                     continue
-
-                # 噪音过滤
-                if is_noise(poi):
-                    continue
-
-                # 类别筛选
-                if not should_keep_by_type(poi):
-                    continue
-
-                # 全部通过，收录
                 seen_ids.add(poi_id)
-                all_venues.append(extract_fields(poi))
-                page_new_count += 1
 
-            print(
-                f"  第{page}页：共 {len(pois)} 条，"
-                f"新增收录 {page_new_count} 条，"
-                f"累计 {len(all_venues)} 条"
-            )
+                route = classify_poi(poi)
+                if route == "discard":
+                    continue
+                if route == "direct":
+                    all_venues.append(extract_fields(poi))
+                    page_direct += 1
+                elif route == "buffer":
+                    buffer_pool.append(poi)
+                    page_buffer += 1
 
-            # 翻页终止条件：当前页不足 PAGE_SIZE 条，
-            # 或者已拉取到总记录数
+            print(f"  第{page}页：共 {len(pois)} 条 | "
+                  f"直接收录 {page_direct} | 缓冲池 {page_buffer} | "
+                  f"累计直接收录 {len(all_venues)} | 缓冲池累计 {len(buffer_pool)}")
+
             if len(pois) < PAGE_SIZE or page * PAGE_SIZE >= total_count:
                 print(f"  已翻至最后一页，结束关键词「{keyword}」。")
                 break
 
             page += 1
             time.sleep(REQUEST_INTERVAL)
+
+    # === 第二阶段：缓冲池清洗与打捞 ===
+    print(f"\n====== 缓冲池清洗与关键字打捞 ======")
+    print(f"  缓冲池初始记录数：{len(buffer_pool)}")
+
+    cleaned = clean_buffer(buffer_pool)
+    all_venues.extend(cleaned)
 
     return all_venues
 
@@ -247,9 +278,18 @@ def main():
     print("=" * 60)
     print(f"检索关键词：{KEYWORDS}")
     print(f"噪音黑名单：{NOISE_KEYWORDS}")
+    print(f"打捞关键词：{SALVAGE_KEYWORDS}")
     print(f"目标城市：{CITY}")
+    print(f"直接收录 typecode：{DIRECT_TYPECODES}")
+    print(f"缓冲池 typecode：{BUFFER_TYPECODES}")
     print(f"输出文件：{OUTPUT_CSV}")
     print("=" * 60)
+
+    if not AMAP_KEY:
+        print("\n[错误] 环境变量 AMAP_KEY 未设置。")
+        print("请在 GitHub Actions 的 repo secrets 中添加 AMAP_KEY")
+        print("或本地运行：$env:AMAP_KEY=\"your_key\"; python fetch_art_venues.py")
+        return
 
     venues = fetch_all_venues()
 
@@ -260,35 +300,7 @@ def main():
     # 转为 DataFrame
     df = pd.DataFrame(venues)
 
-    # === 对部分 typecode 分类做进一步人工规则补充 ===
-    def refine_type(row):
-        typecode = row.get("typecode", "")
-        name = row.get("name", "")
-        ptype = row.get("type", "")
-
-        # 核心防漏规则：如果名字里包含单字 "茶"，且它不是正规的文化馆（16开头）或景区（05开头）
-        # 比如餐饮类(05/06)里面的"某某茶艺术空间"，直接剔除
-        if "茶" in name and not typecode.startswith(("16", "05")):
-            return False
-    
-        # ==========================================================
-        # 🛠️ 临时排查逻辑：揪出到底是谁被卡在了这里
-        # ==========================================================
-        if not typecode.startswith(("16", "05")) and not any(kw in name for kw in ["艺术空间", "画廊"]):
-            # 如果名字里包含“空间”，但因为触发了上面的严格限制被拦截，我们把它打印出来看看
-            if "空间" in name:
-                print(f"🔍 [拦截排查] 名称: {name} | 编码: {typecode} | 官方分类: {ptype}")
-            return False  # 丢弃
-            
-        return True
-
-    before = len(df)
-    df = df[df.apply(refine_type, axis=1)]
-    after = len(df)
-    if before - after > 0:
-        print(f"\n[二次清洗] 通过 typecode 规则又过滤了 {before - after} 条记录。")
-
-    # 按行政区排序
+    # 按行政区 + 场馆名称排序
     df = df.sort_values(["adname", "name"]).reset_index(drop=True)
 
     # 导出 CSV（utf-8-sig 确保 Excel 打开不乱码）
@@ -305,7 +317,12 @@ def main():
     for area, count in area_stats.items():
         print(f"  {area}：{count} 家")
 
+    # typecode 分布
+    print("\n=== typecode 分类统计 ===")
+    type_stats = df["typecode"].value_counts().sort_index()
+    for tc, count in type_stats.items():
+        print(f"  {tc}：{count} 家")
+
 
 if __name__ == "__main__":
     main()
-  
