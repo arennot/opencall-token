@@ -103,7 +103,7 @@ def should_keep_by_type(poi: dict) -> bool:
     if typecode.startswith("05"):
         return True
     # 名称中带"艺术空间"的白名单
-    if "艺术空间" in name or "画廊" in name or "Gallery" in name.into_upper():
+    if "艺术空间" in name or "画廊" in name or "gallery" in name.lower():
         return True
 
     return False
