@@ -1,0 +1,21 @@
+Date: Thu, 02 Jul 2026 16:48:08 GMT
+Content-Type: text/html; charset=UTF-8
+Cache-Control: max-age=86400, public
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Content-Language: en
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=9si2%2FqsjsbkLO7UW3FyIVqg%2FcBZV9Irx1oHbr3j%2BZ7kTQr85PaAVn%2FOMk%2FQEdoywd25tCZG7wruSxU2EE88AZbGzcQu7zXux2Jzs5OteWFs%2FsBksRwp%2BShiNd2JGpd3td%2FFxukFmQg9JDtm6l%2F72km9Wdw%3D%3D"}]}
+Expires: Sun, 19 Nov 1978 05:00:00 GMT
+Last-Modified: Thu, 02 Jul 2026 15:20:34 GMT
+Server: cloudflare
+Vary: Cookie
+Vary: accept-encoding
+X-Content-Type-Options: nosniff
+X-Drupal-Cache: HIT
+X-Drupal-Dynamic-Cache: MISS
+X-Frame-Options: SAMEORIGIN
+X-Generator: Drupal 10 (https://www.drupal.org)
+Age: 372
+Cf-Cache-Status: HIT
+Content-Encoding: gzip
+Cf-Ray: a14f22e7dfe6a62f-MAN
+Alt-Svc: h3=":443"; ma=86400
