@@ -1,0 +1,36 @@
+name: 高德 POI 查询 —— 商户分类编码
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "商户名称，例如 故宫博物院"
+        required: true
+        type: string
+      city:
+        description: "城市（可选），例如 北京"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: 查询 POI
+        env:
+          AMAP_KEY: ${{ secrets.AMAP_KEY }}
+        run: |
+          python scripts/amap_poi_lookup.py \
+            --name "${{ inputs.name }}" \
+            --city "${{ inputs.city }}"
