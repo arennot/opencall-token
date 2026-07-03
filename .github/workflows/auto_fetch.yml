@@ -2,9 +2,15 @@ name: 自动更新美术馆名录数据
 
 on:
   schedule:
-    # 比如设定每周一凌晨 0 点自动运行一次 (UTC 时间，+8 小时为北京时间)
+    # 每周一凌晨 0 点自动运行一次 (UTC 时间，+8 小时为北京时间)
     - cron: '0 16 * * 0'
-  workflow_dispatch: # 允许你在 GitHub 页面上手动点击按钮触发运行
+  workflow_dispatch:
+    inputs:
+      city:
+        description: "目标城市，如：上海市、广州市（默认：北京市）"
+        required: false
+        default: "北京市"
+        type: string
 
 jobs:
   build-and-run:
@@ -30,17 +36,21 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas requests
 
-    # 4. 运行抓取脚本（传入我们保存在 Secrets 里的高德 Key）
+    # 4. 运行抓取脚本
     - name: Run fetch script
       env:
         AMAP_KEY: ${{ secrets.AMAP_KEY }}
+        CITY: ${{ inputs.city || '北京市' }}
       run: python fetch_art_venues.py
 
-    # 5. 自动把新生成的 CSV 提交并推送到你的 GitHub 仓库
+    # 5. 自动提交并推送 CSV
     - name: Commit and push changes
       run: |
         git config --global user.name "GitHub Action Bot"
         git config --global user.email "action@github.com"
-        git add beijing_art_museums_raw.csv
-        # 只有在数据有变化时才提交，防止报错
-        git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 自动更新: 北京艺术场馆数据" && git push)
+        git add *_art_museums_raw.csv
+        git diff --quiet && git diff --staged --quiet || (
+          git commit -m "🤖 自动更新: ${{ inputs.city || '北京市' }}艺术场馆数据" &&
+          git pull --rebase &&
+          git push
+        )

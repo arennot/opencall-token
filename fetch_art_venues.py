@@ -1,13 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-高德地图 POI 批量抓取脚本 —— 北京艺术场馆数据采集
+高德地图 POI 批量抓取脚本 —— 可配置城市艺术场馆数据采集
 
 功能说明：
-  利用高德地图 Web 服务 API（text_search 接口），批量检索北京
-  美术馆、当代艺术中心、艺术空间、画院、画廊等关键词，经过两阶段
-  清洗（分类路由 -> 缓冲池噪音过滤 + 关键字打捞），输出结构化的
-  场馆 CSV 数据，用于艺术聚合平台。
+  利用高德地图 Web 服务 API（text_search 接口），批量检索指定城市的
+  美术馆、当代艺术中心、艺术空间、画院、画廊等关键词，经过两阶段清洗
+  （分类路由 -> 缓冲池噪音过滤 + 关键字打捞），输出结构化的场馆 CSV 数据。
 
 两阶段流程：
   第一阶段：分页检索 + 分类路由
@@ -18,31 +17,30 @@
     - 黑名单噪音过滤
     - 关键字打捞（名/类/址需含艺术、美术、画院、美术馆、画廊、空间、中心、馆等）
 
-使用方法（GitHub Actions）：
-  通过环境变量 AMAP_KEY 传入高德 Web 服务 API Key。
-  本地运行时：$env:AMAP_KEY="your_key"; python fetch_art_venues.py
+使用方法：
+  命令行传参：python fetch_art_venues.py --city 上海市
+  环境变量：   $env:AMAP_KEY="your_key"; $env:CITY="上海市"; python fetch_art_venues.py
+  GitHub Actions 通过 secrets.AMAP_KEY + env.CITY 传入
 
 依赖：
   pip install pandas requests
 """
 
 import time
+import argparse
 import requests
 import pandas as pd
 import os
 
 # ============================================================
-# 1. 参数配置（入口配置区）
+# 1. 参数配置
 # ============================================================
 
-# 高德地图 Web 服务 API Key（从环境变量读取，适配 GitHub Actions）
+# 高德地图 Web 服务 API Key（从环境变量读取）
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
 # 高德 POI 搜索接口地址
 AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
-
-# 目标城市
-CITY = "北京市"
 
 # 检索关键字列表
 KEYWORDS = [
@@ -91,9 +89,6 @@ PAGE_SIZE = 25
 # 请求间隔（秒），用于避免触发 QPS 限制
 REQUEST_INTERVAL = 0.5
 
-# 输出文件名
-OUTPUT_CSV = "beijing_art_museums_raw.csv"
-
 
 # ============================================================
 # 2. 核心处理函数
@@ -126,7 +121,7 @@ def has_salvage_keyword(poi: dict) -> bool:
 def classify_poi(poi: dict) -> str:
     """根据 typecode 对 POI 分类路由。
     返回值："direct"（直接收录）| "buffer"（进入缓冲池）| "discard"（丢弃）"""
-    typecode = poi.get("typecode", "")
+    typecode = str(poi.get("typecode", ""))
     if typecode in DIRECT_TYPECODES:
         return "direct"
     if typecode in BUFFER_TYPECODES:
@@ -169,7 +164,7 @@ def clean_buffer(buffer: list[dict]) -> list[dict]:
 # 3. 分页检索与两阶段采集
 # ============================================================
 
-def fetch_all_venues() -> list[dict]:
+def fetch_all_venues(city: str) -> list[dict]:
     """
     两阶段采集流程：
     第一阶段 —— 分页检索与分类路由：
@@ -194,7 +189,7 @@ def fetch_all_venues() -> list[dict]:
             params = {
                 "key": AMAP_KEY,
                 "keywords": keyword,
-                "city": CITY,
+                "city": city,
                 "offset": PAGE_SIZE,
                 "page": page,
                 "extensions": "all",
@@ -274,25 +269,39 @@ def fetch_all_venues() -> list[dict]:
 # ============================================================
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="高德地图 POI 抓取工具 —— 艺术场馆数据采集（可配置城市）"
+    )
+    parser.add_argument(
+        "--city", type=str, default=os.environ.get("CITY", "北京市"),
+        help="目标城市，如：北京市、上海市、广州市（默认：北京市）"
+    )
+    args = parser.parse_args()
+
+    city = args.city
+    # 取城市名前两个字作为文件名标识
+    city_short = city[:2]
+    output_csv = f"{city_short}_art_museums_raw.csv"
+
     print("=" * 60)
-    print("高德地图 POI 抓取工具 —— 北京艺术场馆数据采集")
+    print(f"高德地图 POI 抓取工具 —— {city}艺术场馆数据采集")
     print("=" * 60)
+    print(f"目标城市：{city}")
     print(f"检索关键词：{KEYWORDS}")
     print(f"噪音黑名单：{NOISE_KEYWORDS}")
     print(f"打捞关键词：{SALVAGE_KEYWORDS}")
-    print(f"目标城市：{CITY}")
     print(f"直接收录 typecode：{DIRECT_TYPECODES}")
     print(f"缓冲池 typecode：{BUFFER_TYPECODES}")
-    print(f"输出文件：{OUTPUT_CSV}")
+    print(f"输出文件：{output_csv}")
     print("=" * 60)
 
     if not AMAP_KEY:
         print("\n[错误] 环境变量 AMAP_KEY 未设置。")
         print("请在 GitHub Actions 的 repo secrets 中添加 AMAP_KEY")
-        print("或本地运行：$env:AMAP_KEY=\"your_key\"; python fetch_art_venues.py")
+        print("或本地运行：$env:AMAP_KEY=\"your_key\"; python fetch_art_venues.py --city 上海市")
         return
 
-    venues = fetch_all_venues()
+    venues = fetch_all_venues(city)
 
     if not venues:
         print("\n未获取到任何有效数据，请检查 API Key 或网络连接。")
@@ -305,11 +314,11 @@ def main():
     df = df.sort_values(["adname", "name"]).reset_index(drop=True)
 
     # 导出 CSV（utf-8-sig 确保 Excel 打开不乱码）
-    df.to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+    df.to_csv(output_csv, index=False, encoding="utf-8-sig")
 
     print(f"\n{'=' * 60}")
     print(f"抓取完成！最终收录 {len(df)} 个场馆。")
-    print(f"数据已保存至：{OUTPUT_CSV}")
+    print(f"数据已保存至：{output_csv}")
     print(f"{'=' * 60}")
 
     # 简要统计
