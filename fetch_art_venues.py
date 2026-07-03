@@ -124,47 +124,6 @@ def should_keep_by_type(poi: dict) -> bool:
     return False
 
 
-"""
-def should_keep_by_type(poi: dict) -> bool:
-    """
-    根据高德分类编码（typecode）二次筛选，尽可能保留艺术类场馆，
-    剔除纯商业零售店铺。
-
-    保留规则（按优先级）：
-      1. typecode 以 "16" 开头 —— 高德分类中文化/艺术/体育大类
-         （160000 = 文化场馆类，160100 = 博物馆/美术馆等）
-      2. typecode 以 "05" 开头 —— 高德分类中风景名胜/旅游景区类
-         部分艺术园区可能归为此类
-      3. 名称中包含明确的 "艺术空间" —— 即使归类到其他门类
-         也很有可能是独立艺术空间
-
-    其余 typecode（如 06 餐饮、07 购物、08 生活服务等）直接丢弃。
-    """
-    typecode = poi.get("typecode", "")
-    ptype = str(poi.get("type", ""))      # 高德官方标签流，例如："公司企业;文化传媒;画廊"
-    name = poi.get("name", "")
-
-    # ----------------------------------------------------
-    # 第一层：【核心标签判定】（最高优先级）
-    # 只要官方标签里明确写了“画廊”或“美术馆”，直接放行
-    # ----------------------------------------------------
-    if "画廊" in ptype or "美术馆" in ptype:
-        return True
-  
-    # 文化 / 艺术 / 体育大类
-    if typecode.startswith("16"):
-        return True
-    # 风景名胜 / 旅游景区
-    if typecode.startswith("05"):
-        return True
-    # 名称中带"艺术空间"的白名单
-    if "艺术空间" in name or "画廊" in name or "gallery" in name.lower():
-        return True
-
-    return False
-"""
-
-
 def extract_fields(poi: dict) -> dict:
     """
     从高德返回的单条 POI 字典中提取所需字段。
