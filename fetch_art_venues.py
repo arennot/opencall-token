@@ -19,13 +19,15 @@
 import time
 import requests
 import pandas as pd
+import os
 
 # ============================================================
 # 1. 参数配置
 # ============================================================
 
-# 高德地图 Web 服务 API Key（请替换为你自己的 Key）
-AMAP_KEY = "YOUR_AMAP_KEY_HERE"
+# 高德地图 Web 服务 API Key
+AMAP_KEY = os.environ.get("AMAP_KEY", "")
+
 
 # 高德 POI 搜索接口地址
 AMAP_TEXT_SEARCH_URL = "https://restapi.amap.com/v3/place/text"
